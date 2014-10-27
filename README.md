@@ -13,4 +13,4 @@ To run:
 3. ./main <midi folder>
    For example, ./main ../midis/The_Beatles
 4. ./demo <instrument name> -ow <output file name> -if output.ski
-   For example, ./demo Wurley -ow output.wav -if output.ski
+   For example, ./demo Plucked -ow output.wav -if output.ski
