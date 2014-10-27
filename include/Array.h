@@ -76,3 +76,4 @@ ostream& operator<<(ostream& out, Array<char>& astring);
 
 
 // md5sum: 09d1b1f8e70ecde53f484548e48f33c3 Array.h [20030102]
+
