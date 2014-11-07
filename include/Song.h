@@ -7,14 +7,15 @@ using namespace std;
 
 void Song::addNote(Note newNote) {
 	if (this->length == this->maxLength) {
-		cout<<"\nCannot add more. Overflow!";
+		cout<<"\nCannot add more. Overflow! maxLength = "<<this->maxLength;
+		cin.get();
 		return;
 	}
 
 	this->notes[this->length] = newNote;
-	this->length++;
-	this->frequencyTable[newNote.pitch]++;
-	this->chromaticFrequencyTable[newNote.chromaticPitch]++;	
+	this->length += 1;
+	this->frequencyTable[newNote.pitch] += 1;
+	this->chromaticFrequencyTable[newNote.chromaticPitch] += 1;	
 }
 
 void Song::preprocess() {
@@ -41,8 +42,8 @@ void Song::findFitness() {
 	this->zipfChromaticPitchFitness = 1.0/(this->zipfChromaticPitchVariance());
 	this->pitchDistanceFitness = ((double)this->zipfLength)/(this->pitchDistanceVariance());
 	this->chromaticPitchDistanceFitness = ((double)this->zipfChromaticLength)/(this->chromaticPitchDistanceVariance());
-	this->lz77PitchCompressionFactor = (double)this->length/(double)this->lz77Length();
-	this->lz77ChromaticPitchCompressionFactor = (double)this->length/(double)this->lz77LengthChromatic();
+	//this->lz77PitchCompressionFactor = (double)this->length/(double)this->lz77Length();
+	//this->lz77ChromaticPitchCompressionFactor = (double)this->length/(double)this->lz77LengthChromatic();
 	this->fitness = (
 				(this->zipfPitchFitness) + 
 				(this->zipfChromaticPitchFitness) + 
@@ -64,153 +65,18 @@ void Song::clear() {
 	this->chromaticPitchDistanceFitness = -1;
 }
 
-int Song::lz77Length() {
-	int lookAheadPtr, searchPtr;
-	int outputLength = 0;
-
-	if (this->length == 0)
-		return 0;
-
-	for (lookAheadPtr = 0; lookAheadPtr<this->length; lookAheadPtr++) {
-		for (searchPtr = 0; searchPtr<lookAheadPtr; searchPtr++ ) {
-			if (this->notes[lookAheadPtr].pitch == this->notes[searchPtr].pitch) {
-				while (this->notes[lookAheadPtr].pitch == this->notes[searchPtr].pitch) {
-					lookAheadPtr++;
-					searchPtr++;
-				}
-			}
-		}
-		outputLength++;
-	}
-
-	return outputLength;
-}
-
-int Song::lz77LengthChromatic() {
-	int lookAheadPtr, searchPtr;
-	int outputLength = 0;
-
-	if (this->length == 0)
-		return 0;
-
-	for (lookAheadPtr = 0; lookAheadPtr<this->length; lookAheadPtr++) {
-		for (searchPtr = 0; searchPtr<lookAheadPtr; searchPtr++ ) {
-			if (this->notes[lookAheadPtr].chromaticPitch == this->notes[searchPtr].chromaticPitch) {
-				while (this->notes[lookAheadPtr].chromaticPitch == this->notes[searchPtr].chromaticPitch) {
-					lookAheadPtr++;
-					searchPtr++;
-				}
-			}
-		}
-		outputLength++;
-	}
-
-	return outputLength;
-}
-
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////    GENETIC ALGORITHM RELATED FUNCTIONS    /////////////////////////////////////////////
-
-void Song::mutate() {
-	int mutationPoint;
-	int newPitch;
-		
-	mutationPoint = rand()%this->length;
-	newPitch = rand()%12;
-
-	this->frequencyTable[this->notes[mutationPoint].pitch] -= 1;
-	this->chromaticFrequencyTable[this->notes[mutationPoint].pitch] -= 1;
-
-	this->notes[mutationPoint].pitch = newPitch;
-	this->notes[mutationPoint].chromaticPitch = newPitch;	
-
-	this->frequencyTable[newPitch] += 1;
-	this->chromaticFrequencyTable[newPitch] += 1;
-}
-
-void Song::fuse(Song copy, Song piece) {
-	int i;
-	
-	this->maxLength = (copy.length + piece.length + 1);
-	this->length = this->maxLength;
-	this->notes = (Note*)malloc(sizeof(Note)*length);
-
-	for (i=0; i<88; i++) {
-		this->frequencyTable[i] = 0;
-	}
-
-	for (i=0; i<12; i++) {
-		this->chromaticFrequencyTable[i] = 0;
-	}
-
-	for (i=0; i<copy.length; i++) {
-		this->notes[i] = Note(copy.notes[i]);
-		this->frequencyTable[copy.notes[i].pitch]++;
-		this->chromaticFrequencyTable[copy.notes[i].chromaticPitch]++;
-	}
-
-	for (i=0; i<piece.length; i++) {
-		this->notes[i+copy.length] = Note(piece.notes[i]);
-		this->frequencyTable[piece.notes[i].pitch]++;
-		this->chromaticFrequencyTable[piece.notes[i].chromaticPitch]++;
-	}
-}
-
-void Song::replace() {
-	int replacementLength, replacementPoint, pastePoint1, pastePoint2, i;
-
-	replacementPoint = rand()%(this->length-1);
-	replacementLength = rand()%(this->length-replacementPoint);
-	pastePoint1 = rand()%(this->length-replacementPoint);
-	pastePoint2 = rand()%(this->length-replacementPoint);
-
-
-	for (i=pastePoint1; i<(pastePoint1+replacementLength); i++ ) {
-		this->frequencyTable[this->notes[i].pitch]++;
-		this->chromaticFrequencyTable[this->notes[i].chromaticPitch]++;
-
-		this->frequencyTable[this->notes[i+replacementLength].pitch]--;
-		this->chromaticFrequencyTable[this->notes[i+replacementLength].chromaticPitch]--;
-
-		this->notes[i+replacementLength] = this->notes[i];
-	}
-
-	for (i=pastePoint2; i<(pastePoint2+replacementLength); i++ ) {
-		this->frequencyTable[this->notes[i].pitch]++;
-		this->chromaticFrequencyTable[this->notes[i].chromaticPitch]++;
-
-		this->frequencyTable[this->notes[i+replacementLength].pitch]--;
-		this->chromaticFrequencyTable[this->notes[i+replacementLength].chromaticPitch]--;
-
-		this->notes[i+replacementLength] = this->notes[i];
-	}
-}
-
-void Song::elide() {
-	int i, elisionPoint;
-
-	elisionPoint = rand()%this->length;
-	this->frequencyTable[this->notes[elisionPoint].pitch] -= 1;
-	this->chromaticFrequencyTable[this->notes[elisionPoint].pitch] -= 1;
-
-	for (i=elisionPoint; i<this->length-1; i++) {
-		this->notes[i] = this->notes[i+1];
-	}
-
-	this->length -= 1;
-	this->maxLength -= 1;
-}
-
-//////////////////////////////////////////// END OF GENETIC ALGORITHM RELATED FUNCTIONS  //////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////    CONSTRUCTORS    /////////////////////////////////////////////////////////
 	
 	Song::Song() {
+		this->maxLength = 0;
 		this->length = 0;
+		this->zipfLength = 0;
+		this->zipfChromaticLength = 0;
+		this->fitness = 0;
+		
 		int i;
 	
 		for (i=0; i<88; i++)
@@ -220,28 +86,50 @@ void Song::elide() {
 			this->chromaticFrequencyTable[i] = 0;
 	}
 
-/**////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 	
 	Song::Song(int _maxLength) {
 		this->maxLength = _maxLength;
+
+		if (this->maxLength <= 0) {
+			cout<<"\n\nError in notes initialization in Song constructor. maxLength = 0";
+			cin.get();
+		}
+
+		//cout<<"\nmallocing notes - "<<this->maxLength<<"\t";
 		this->notes = (Note*)malloc(sizeof(Note)*this->maxLength);
 		this->length = 0;
 		int i;
 		
+		//cout<<"init tables\t";
 		for (i=0; i<88; i++)
 			this->frequencyTable[i] = 0;
 	
 		for (i=0; i<12; i++)
 			this->chromaticFrequencyTable[i] = 0;
+
+		this->zipfLength = 0;
+		this->zipfChromaticLength = 0;
+		this->fitness = 0;
+		//cout<<"Exiting constructor";
 	}
 	
-/**////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	Song::Song(int _length, double cumulativeTransitionProbabilityMatrix[12][12]) {
 		int i, j, currentPitch, randomNumber;
 	
 		this->length = this->maxLength = _length;
-		this->notes = (Note*)malloc(sizeof(Note)*length);
+		this->zipfLength = 0;
+		this->zipfChromaticLength = 0;
+		this->fitness = 0;
+
+		if (this->length <= 0) {
+			cout<<"\n\nError in notes initialization in Song constructor. length = 0";
+			cin.get();
+		}
+
+		this->notes = (Note*)malloc(sizeof(Note)*this->length);
 	
 		for (i=0; i<88; i++)
 			this->frequencyTable[i] = 0;
@@ -486,71 +374,211 @@ void Song::elide() {
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////    GENETIC ALGORITHM RELATED FUNCTIONS    /////////////////////////////////////////////
+
+	void Song::mutate() {
+		//cout<<"\nMutating\t";
+		int mutationPoint;
+		int newPitch;
+		
+		mutationPoint = rand()%this->length;
+		newPitch = rand()%12;
+
+		this->frequencyTable[this->notes[mutationPoint].pitch] -= 1;
+		this->chromaticFrequencyTable[this->notes[mutationPoint].pitch] -= 1;
+
+		this->notes[mutationPoint].pitch = newPitch;
+		this->notes[mutationPoint].chromaticPitch = newPitch;	
+
+		this->frequencyTable[newPitch] += 1;
+		this->chromaticFrequencyTable[newPitch] += 1;
+		//cout<<"Mutated";
+	}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	void Song::fuse(Song copy, Song piece) {
+		//cout<<"\nFusing\t";
+		int i;
+	
+		this->maxLength = (copy.length + piece.length + 1);
+		this->length = this->maxLength;
+
+		//if (this->notes != NULL) {
+		//	free(this->notes);
+		//}	
+
+		if (this->length <= 0) {
+			cout<<"\n\nError in notes initialization in fuse. length = 0";
+			cin.get();
+		}
+
+		this->notes = (Note*)realloc(this->notes, sizeof(Note)*this->length);
+
+		for (i=0; i<88; i++) {
+			this->frequencyTable[i] = 0;
+		}
+
+		for (i=0; i<12; i++) {
+			this->chromaticFrequencyTable[i] = 0;
+		}
+
+		for (i=0; i<copy.length; i++) {
+			this->notes[i] = Note(copy.notes[i]);
+			this->frequencyTable[copy.notes[i].pitch]++;
+			this->chromaticFrequencyTable[copy.notes[i].chromaticPitch]++;
+		}
+
+		for (i=0; i<piece.length; i++) {
+			this->notes[i+copy.length] = Note(piece.notes[i]);
+			this->frequencyTable[piece.notes[i].pitch]++;
+			this->chromaticFrequencyTable[piece.notes[i].chromaticPitch]++;
+		}
+		//cout<<"Fused";
+	}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	void Song::replace() {
+		//cout<<"\nReplacing\t";
+		int copyStart, copyFinish, pasteStart1, pasteStart2, i, j, k;
+
+		copyStart = rand()%(this->length/2);
+		copyFinish = copyStart + rand()%(this->length/2);
+		pasteStart1 = rand()%(this->length/2);
+		pasteStart2 = pasteStart1 + rand()%(this->length/2);
+
+
+		for (i=copyStart, j=pasteStart1, k=pasteStart2; i<copyFinish; i++, j++, k++ ) {
+			
+			if (j == this->maxLength || k == this->maxLength) {
+				break;
+			}
+
+			this->frequencyTable[this->notes[i].pitch] += 2;
+			this->chromaticFrequencyTable[this->notes[i].chromaticPitch] += 2;
+
+			this->frequencyTable[this->notes[j].pitch] -= 1;
+			this->chromaticFrequencyTable[this->notes[j].chromaticPitch] -= 1;
+			this->frequencyTable[this->notes[k].pitch] -= 1;
+			this->chromaticFrequencyTable[this->notes[k].chromaticPitch] -= 1;
+
+			this->notes[j] = this->notes[i];
+			this->notes[k] = this->notes[i];
+		}
+		//cout<<"Replaced";
+	}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	void Song::elide() {
+		//cout<<"\nEliding\t";
+		int i, elisionPoint;
+		Note *notesCopy;
+
+		for (i=0; i<88; i++)
+			this->frequencyTable[i] = 0;
+	
+		for (i=0; i<12; i++)
+			this->chromaticFrequencyTable[i] = 0;
+
+		notesCopy = (Note*)malloc(sizeof(Note)*this->length);
+		elisionPoint = rand()%this->length;
+
+		for (i=0; i<this->length; i++) {
+			notesCopy[i] = this->notes[i];
+		}
+		
+		//this->maxLength = this->length-1;
+
+		//if (this->notes != NULL) {
+		//	free(this->notes);
+		//}
+		//this->notes = (Note*)realloc(this->notes, sizeof(Note)*this->maxLength);
+
+		i=0;
+		this->length = 0;		
+		while (i<this->maxLength) {
+			if (i != elisionPoint) {
+				this->addNote(notesCopy[i]);
+			}
+			i++;
+		}
+
+		this->maxLength = this->length;
+	}
+
+//////////////////////////////////////////// END OF GENETIC ALGORITHM RELATED FUNCTIONS  //////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////    TRANSITION PROBABILITY MATRIX RELATED FUNCTIONS    //////////////////////////////////////////
-/**/
-/**/	int Song::areAdjacentNotes(Note note_1, Note note_2) {
-/**/		if (note_2.start - note_1.end >= 0 && note_2.start - note_1.end < 10)
-/**/			return 1;
-/**/		else
-/**/			if (note_2.start - note_1.end > 10)
-/**/				return -1;
-/**/			else
-/**/				return 0;
-/**/	}
-/**/
-/**////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/**/	
-/**/	int Song::findFollowingChromaticPitchesFor(int currentPitch, double followingPitchOccurances[]) {
-/**/		int i, j, sum = 0;
-/**/
-/**/		for (i=0; i<12; i++)
-/**/			followingPitchOccurances[i] = 0;
-/**/			
-/**/		for (i=0; i<this->length; i++) {
-/**/			if (this->notes[i].chromaticPitch == currentPitch) {
-/**/				for (j=i+1; j<this->length; j++) {
-/**/					if (areAdjacentNotes(this->notes[i], this->notes[j]) == 1) {
-/**/						followingPitchOccurances[this->notes[j].chromaticPitch]++;
-/**/					}
-/**/					if (areAdjacentNotes(this->notes[i], this->notes[j]) == -1) {
-/**/						break;
-/**/					}
-/**/				}
-/**/			}
-/**/		}
-/**/	
-/**/		for (i=0; i<12; i++) {
-/**/			sum += followingPitchOccurances[i];
-/**/		}
-/**/
-/**/		return sum;
-/**/	}
-/**/
-/**////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/**/	
-/**/	void Song::createTransitionProbabilityMatrix() {
-/**/		int i, j;
-/**/		for (i=0; i<12; i++) {
-/**/			for (j=0; j<12; j++) {
-/**/				this->transitionProbabilityMatrix[i][j] = 0.0;
-/**/			}
-/**/		}
-/**/	
-/**/		int currentPitch;
-/**/		double followingPitchOccurances[12];
-/**/		double totalPitchOccurances;
-/**/
-/**/		for (currentPitch = 0; currentPitch < 12; currentPitch++) {
-/**/			totalPitchOccurances = this->findFollowingChromaticPitchesFor(currentPitch, followingPitchOccurances);
-/**/			for (i=0; i<12; i++) {
-/**/				if (totalPitchOccurances == 0)
-/**/					this->transitionProbabilityMatrix[currentPitch][i] = 0;
-/**/				else
-/**/					this->transitionProbabilityMatrix[currentPitch][i] = (double)(followingPitchOccurances[i]/totalPitchOccurances);
-/**/			}
-/**/		}
-/**/	}
-/**/	
+
+	int Song::areAdjacentNotes(Note note_1, Note note_2) {
+		if (note_2.start - note_1.end >= 0 && note_2.start - note_1.end < 10)
+			return 1;
+		else
+			if (note_2.start - note_1.end > 10)
+				return -1;
+			else
+				return 0;
+	}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	
+	int Song::findFollowingChromaticPitchesFor(int currentPitch, double followingPitchOccurances[]) {
+		int i, j, sum = 0;
+
+		for (i=0; i<12; i++)
+			followingPitchOccurances[i] = 0;
+			
+		for (i=0; i<this->length; i++) {
+			if (this->notes[i].chromaticPitch == currentPitch) {
+				for (j=i+1; j<this->length; j++) {
+					if (areAdjacentNotes(this->notes[i], this->notes[j]) == 1) {
+						followingPitchOccurances[this->notes[j].chromaticPitch]++;
+					}
+					if (areAdjacentNotes(this->notes[i], this->notes[j]) == -1) {
+						break;
+					}
+				}
+			}
+		}
+	
+		for (i=0; i<12; i++) {
+			sum += followingPitchOccurances[i];
+		}
+
+		return sum;
+	}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	
+	void Song::createTransitionProbabilityMatrix() {
+		int i, j;
+		for (i=0; i<12; i++) {
+			for (j=0; j<12; j++) {
+				this->transitionProbabilityMatrix[i][j] = 0.0;
+			}
+		}
+	
+		int currentPitch;
+		double followingPitchOccurances[12];
+		double totalPitchOccurances;
+
+		for (currentPitch = 0; currentPitch < 12; currentPitch++) {
+			totalPitchOccurances = this->findFollowingChromaticPitchesFor(currentPitch, followingPitchOccurances);
+			for (i=0; i<12; i++) {
+				if (totalPitchOccurances == 0)
+					this->transitionProbabilityMatrix[currentPitch][i] = 0;
+				else
+					this->transitionProbabilityMatrix[currentPitch][i] = (double)(followingPitchOccurances[i]/totalPitchOccurances);
+			}
+		}
+	}
+	
 ///////////////////////////////////// END OF TRANSITION PROBABILITY MATRIX RELATED FUNCTIONS  /////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -558,303 +586,357 @@ void Song::elide() {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////    ZIPF LAW RELATED FUNCTIONS    /////////////////////////////////////////////////////
-/**/
-/**/	int Song::mostFrequent() {
-/**/		int i;
-/**/		int max = -1;
-/**/		for (i=0; i<88; i++) {
-/**/			if (max == -1 || frequencyTable[i] > frequencyTable[max])
-/**/				max = i;
-/**/		}
-/**/		return max;
-/**/	}
-/**/
-/**////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/**/	
-/**/	int Song::chromaticMostFrequent() {
-/**/		int i;
-/**/		int max = -1;
-/**/		for (i=0; i<12; i++) {
-/**/			if (max == -1 || chromaticFrequencyTable[i] > chromaticFrequencyTable[max])
-/**/				max = i;
-/**/		}
-/**/		return max;
-/**/	}
-/**/
-/**////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/**/
-/**/	void Song::rankify() {
-/**/		int i;
-/**/		int _frequencyTable[88];
-/**/	
-/**/		for (i=0; i<88; i++)
-/**/			_frequencyTable[i] = frequencyTable[i];
-/**/	
-/**/		for (i=0; i<88; i++) {
-/**/			pitchRanks[i] = mostFrequent();
-/**/			pitchFrequencies[i] = frequencyTable[pitchRanks[i]];
-/**/			frequencyTable[pitchRanks[i]] = 0;
-/**/		}
-/**/	
-/**/		for (i=0; i<88; i++)
-/**/			frequencyTable[i] = _frequencyTable[i];
-/**/	}
-/**/
-/**////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/**/
-/**/	void Song::chromaticRankify() {
-/**/		int i;
-/**/		int _frequencyTable[12];
-/**/		
-/**/		for (i=0; i<12; i++)
-/**/			_frequencyTable[i] = chromaticFrequencyTable[i];
-/**/		
-/**/		for (i=0; i<12; i++) {
-/**/			chromaticPitchRanks[i] = chromaticMostFrequent();
-/**/			chromaticPitchFrequencies[i] = chromaticFrequencyTable[chromaticPitchRanks[i]];
-/**/			chromaticFrequencyTable[chromaticPitchRanks[i]] = 0;
-/**/		}
-/**/	
-/**/		for (i=0; i<12; i++)
-/**/			chromaticFrequencyTable[i] = _frequencyTable[i];
-/**/	}
-/**/
-/**////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/**/	
-/**/	double Song::zipfPitchVariance_independentRank() {
-/**/		int i;
-/**/	
-/**/		this->zipfLogRanks = (double*)malloc(sizeof(double)*this->zipfLength);
-/**/		this->zipfLogFrequencies = (double*)malloc(sizeof(double)*this->zipfLength);
-/**/	
-/**/		for (i=0; i<zipfLength; i++) {
-/**/			zipfLogRanks[i] = log(i+1);
-/**/			zipfLogFrequencies[i] = log(pitchFrequencies[i]);
-/**/		}
-/**/	
-/**/		double *XY, *X2, sumX=0.0, sumY=0.0, sumXY=0.0, sumX2=0.0, zipfSlope, zipfIntercept;
-/**/		XY = (double*)malloc(sizeof(double)*this->zipfLength);
-/**/		X2 = (double*)malloc(sizeof(double)*this->zipfLength);
-/**/	
-/**/		for (i=0; i<zipfLength; i++) {
-/**/			XY[i] = zipfLogRanks[i]*zipfLogFrequencies[i];
-/**/			X2[i] = zipfLogRanks[i]*zipfLogRanks[i];
-/**/		}
-/**/	
-/**/		for (i=0; i<zipfLength; i++) {
-/**/			sumX += zipfLogRanks[i];
-/**/			sumY += zipfLogFrequencies[i];
-/**/			sumXY += XY[i];
-/**/			sumX2 += X2[i];
-/**/		}
-/**/	
-/**/		zipfSlope = ((zipfLength * sumXY)-(sumX*sumY))/((zipfLength*sumX2)-(sumX*sumX));
-/**/		zipfIntercept = (sumY-(zipfSlope*sumX))/zipfLength;
-/**/	
-/**/		double *diff, *squaredDiff, expectedVal, sumSquaredDiff=0.0, result;
-/**/	
-/**/		diff = (double*)malloc(sizeof(double)*this->zipfLength);
-/**/		squaredDiff = (double*)malloc(sizeof(double)*this->zipfLength);
-/**/	
-/**/		for (i=0; i<zipfLength; i++) {
-/**/			expectedVal = zipfIntercept + (zipfSlope*zipfLogRanks[i]);
-/**/			diff[i] = expectedVal - zipfLogFrequencies[i];
-/**/			squaredDiff[i] = diff[i]*diff[i];
-/**/			sumSquaredDiff += squaredDiff[i];
-/**/		}
-/**/	
-/**/		result = sumSquaredDiff/zipfLength;
-/**/		
-/**/		return result;
-/**/	}
-/**/
-/**////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/**/
-/**/	double Song::zipfPitchVariance_independentFrequency() {
-/**/		int i;
-/**/	
-/**/		double *XY, *X2, sumX=0.0, sumY=0.0, sumXY=0.0, sumX2=0.0, zipfSlope, zipfIntercept;
-/**/		XY = (double*)malloc(sizeof(double)*this->zipfLength);
-/**/		X2 = (double*)malloc(sizeof(double)*this->zipfLength);
-/**/	
-/**/		for (i=0; i<zipfLength; i++) {
-/**/			XY[i] = zipfLogRanks[i]*zipfLogFrequencies[i];
-/**/			X2[i] = zipfLogFrequencies[i]*zipfLogFrequencies[i];
-/**/		}
-/**/	
-/**/		for (i=0; i<zipfLength; i++) {
-/**/			sumX += zipfLogFrequencies[i];
-/**/			sumY += zipfLogRanks[i];
-/**/			sumXY += XY[i];
-/**/			sumX2 += X2[i];
-/**/		}
-/**/	
-/**/		zipfSlope = ((zipfLength * sumXY)-(sumX*sumY))/((zipfLength*sumX2)-(sumX*sumX));
-/**/		zipfIntercept = (sumY-(zipfSlope*sumX))/zipfLength;
-/**/	
-/**/		double *diff, *squaredDiff, expectedVal, sumSquaredDiff=0.0, result;
-/**/	
-/**/		diff = (double*)malloc(sizeof(double)*this->zipfLength);
-/**/		squaredDiff = (double*)malloc(sizeof(double)*this->zipfLength);
-/**/	
-/**/		for (i=0; i<zipfLength; i++) {
-/**/			expectedVal = zipfIntercept + (zipfSlope*zipfLogFrequencies[i]);
-/**/			diff[i] = expectedVal - zipfLogRanks[i];
-/**/			squaredDiff[i] = diff[i]*diff[i];
-/**/			sumSquaredDiff += squaredDiff[i];
-/**/		}
-/**/	
-/**/		result = sumSquaredDiff/zipfLength;
-/**/		
-/**/		return result;
-/**/	}
-/**/
-/**////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/**/
-/**/	double Song::zipfPitchVariance() {
-/**/		int i;
-/**/	
-/**/		this->rankify();	
-/**/	
-/**/		for (i=0; i<88; i++) {
-/**/			if (pitchFrequencies[i] == 0) {
-/**/				break;
-/**/			}
-/**/		}
-/**/		zipfLength = i;
-/**/	
-/**/		this->zipfLogRanks = (double*)malloc(sizeof(double)*this->zipfLength);
-/**/		this->zipfLogFrequencies = (double*)malloc(sizeof(double)*this->zipfLength);
-/**/	
-/**/		for (i=0; i<zipfLength; i++) {
-/**/			zipfLogRanks[i] = log(i+1);
-/**/			zipfLogFrequencies[i] = log(pitchFrequencies[i]);
-/**/		}
-/**/	
-/**/		double independentRank = this->zipfPitchVariance_independentRank();
-/**/		double independentFrequency = this->zipfPitchVariance_independentFrequency();
-/**/	
-/**/		return (independentRank+independentFrequency)/2.0;
-/**/	}
-/**/
-/**////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/**/	
-/**/	double Song::zipfChromaticPitchVariance_independentRank() {
-/**/		int i;
-/**/	
-/**/		this->zipfChromaticLogRanks = (double*)malloc(sizeof(double)*this->zipfChromaticLength);
-/**/		this->zipfChromaticLogFrequencies = (double*)malloc(sizeof(double)*this->zipfChromaticLength);
-/**/	
-/**/		for (i=0; i<zipfChromaticLength; i++) {
-/**/			zipfChromaticLogRanks[i] = log(i+1);
-/**/			zipfChromaticLogFrequencies[i] = log(chromaticPitchFrequencies[i]);
-/**/		}
-/**/	
-/**/		double *XY, *X2, sumX=0.0, sumY=0.0, sumXY=0.0, sumX2=0.0, zipfSlope, zipfIntercept;
-/**/		XY = (double*)malloc(sizeof(double)*this->zipfChromaticLength);
-/**/		X2 = (double*)malloc(sizeof(double)*this->zipfChromaticLength);
-/**/	
-/**/		for (i=0; i<zipfChromaticLength; i++) {
-/**/			XY[i] = zipfChromaticLogRanks[i]*zipfChromaticLogFrequencies[i];
-/**/			X2[i] = zipfChromaticLogRanks[i]*zipfChromaticLogRanks[i];
-/**/		}
-/**/	
-/**/		for (i=0; i<zipfChromaticLength; i++) {
-/**/			sumX += zipfChromaticLogRanks[i];
-/**/			sumY += zipfChromaticLogFrequencies[i];
-/**/			sumXY += XY[i];
-/**/			sumX2 += X2[i];
-/**/		}
-/**/	
-/**/		zipfSlope = ((zipfChromaticLength * sumXY)-(sumX*sumY))/((zipfChromaticLength*sumX2)-(sumX*sumX));
-/**/		zipfIntercept = (sumY-(zipfSlope*sumX))/zipfChromaticLength;
-/**/	
-/**/		double *diff, *squaredDiff, expectedVal, sumSquaredDiff=0.0, result;
-/**/	
-/**/		diff = (double*)malloc(sizeof(double)*this->zipfChromaticLength);
-/**/		squaredDiff = (double*)malloc(sizeof(double)*this->zipfChromaticLength);
-/**/	
-/**/		for (i=0; i<zipfChromaticLength; i++) {
-/**/			expectedVal = zipfIntercept + (zipfSlope*zipfChromaticLogRanks[i]);
-/**/			diff[i] = expectedVal - zipfChromaticLogFrequencies[i];
-/**/			squaredDiff[i] = diff[i]*diff[i];
-/**/			sumSquaredDiff += squaredDiff[i];
-/**/		}
-/**/	
-/**/		result = sumSquaredDiff/zipfChromaticLength;
-/**/		
-/**/		return result;
-/**/	}
-/**/
-/**////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/**/	
-/**/	double Song::zipfChromaticPitchVariance_independentFrequency() {
-/**/		int i;
-/**/	
-/**/		double *XY, *X2, sumX=0.0, sumY=0.0, sumXY=0.0, sumX2=0.0, zipfSlope, zipfIntercept;
-/**/		XY = (double*)malloc(sizeof(double)*this->zipfChromaticLength);
-/**/		X2 = (double*)malloc(sizeof(double)*this->zipfChromaticLength);
-/**/	
-/**/		for (i=0; i<zipfChromaticLength; i++) {
-/**/			XY[i] = zipfChromaticLogRanks[i]*zipfChromaticLogFrequencies[i];
-/**/			X2[i] = zipfChromaticLogFrequencies[i]*zipfChromaticLogFrequencies[i];
-/**/		}
-/**/	
-/**/		for (i=0; i<zipfChromaticLength; i++) {
-/**/			sumX += zipfChromaticLogFrequencies[i];
-/**/			sumY += zipfChromaticLogRanks[i];
-/**/			sumXY += XY[i];
-/**/			sumX2 += X2[i];
-/**/		}
-/**/	
-/**/		zipfSlope = ((zipfChromaticLength * sumXY)-(sumX*sumY))/((zipfChromaticLength*sumX2)-(sumX*sumX));
-/**/		zipfIntercept = (sumY-(zipfSlope*sumX))/zipfChromaticLength;
-/**/	
-/**/		double *diff, *squaredDiff, expectedVal, sumSquaredDiff=0.0, result;
-/**/	
-/**/		diff = (double*)malloc(sizeof(double)*this->zipfChromaticLength);
-/**/		squaredDiff = (double*)malloc(sizeof(double)*this->zipfChromaticLength);
-/**/	
-/**/		for (i=0; i<zipfChromaticLength; i++) {
-/**/			expectedVal = zipfIntercept + (zipfSlope*zipfChromaticLogFrequencies[i]);
-/**/			diff[i] = expectedVal - zipfChromaticLogRanks[i];
-/**/			squaredDiff[i] = diff[i]*diff[i];
-/**/			sumSquaredDiff += squaredDiff[i];
-/**/		}
-/**/	
-/**/		result = sumSquaredDiff/zipfChromaticLength;
-/**/		
-/**/		return result;
-/**/	}
-/**/
-/**////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/**/	
-/**/	double Song::zipfChromaticPitchVariance() {
-/**/		int i;
-/**/	
-/**/		this->chromaticRankify();	
-/**/	
-/**/		for (i=0; i<12; i++) {
-/**/			if (chromaticPitchFrequencies[i] == 0) {
-/**/				break;
-/**/			}
-/**/		}
-/**/		zipfChromaticLength = i;
-/**/	
-/**/		this->zipfChromaticLogRanks = (double*)malloc(sizeof(double)*this->zipfChromaticLength);
-/**/		this->zipfChromaticLogFrequencies = (double*)malloc(sizeof(double)*this->zipfChromaticLength);
-/**/	
-/**/		for (i=0; i<zipfChromaticLength; i++) {
-/**/			zipfChromaticLogRanks[i] = log(i+1);
-/**/			zipfChromaticLogFrequencies[i] = log(chromaticPitchFrequencies[i]);
-/**/		}
-/**/	
-/**/		double independentRank = this->zipfChromaticPitchVariance_independentRank();
-/**/		double independentFrequency = this->zipfChromaticPitchVariance_independentFrequency();
-/**/	
-/**/		return (independentRank+independentFrequency)/2.0;
-/**/	}
-/**/	
+
+	int Song::mostFrequent() {
+		int i;
+		int max = -1;
+		for (i=0; i<88; i++) {
+			if (max == -1 || frequencyTable[i] > frequencyTable[max])
+				max = i;
+		}
+		return max;
+	}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	
+	int Song::chromaticMostFrequent() {
+		int i;
+		int max = -1;
+		for (i=0; i<12; i++) {
+			if (max == -1 || chromaticFrequencyTable[i] > chromaticFrequencyTable[max])
+				max = i;
+		}
+		return max;
+	}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	void Song::rankify() {
+		int i;
+		int _frequencyTable[88];
+	
+		for (i=0; i<88; i++)
+			_frequencyTable[i] = frequencyTable[i];
+	
+		for (i=0; i<88; i++) {
+			pitchRanks[i] = mostFrequent();
+			pitchFrequencies[i] = frequencyTable[pitchRanks[i]];
+			frequencyTable[pitchRanks[i]] = 0;
+		}
+	
+		for (i=0; i<88; i++)
+			frequencyTable[i] = _frequencyTable[i];
+	}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	void Song::chromaticRankify() {
+		int i;
+		int _frequencyTable[12];
+		
+		for (i=0; i<12; i++)
+			_frequencyTable[i] = chromaticFrequencyTable[i];
+		
+		for (i=0; i<12; i++) {
+			chromaticPitchRanks[i] = chromaticMostFrequent();
+			chromaticPitchFrequencies[i] = chromaticFrequencyTable[chromaticPitchRanks[i]];
+			chromaticFrequencyTable[chromaticPitchRanks[i]] = 0;
+		}
+	
+		for (i=0; i<12; i++)
+			chromaticFrequencyTable[i] = _frequencyTable[i];
+	}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	
+	double Song::zipfPitchVariance_independentRank() {
+		int i;
+	
+		for (i=0; i<zipfLength; i++) {
+			zipfLogRanks[i] = log(i+1);
+			zipfLogFrequencies[i] = log(pitchFrequencies[i]);
+		}
+	
+		double *XY, *X2, sumX=0.0, sumY=0.0, sumXY=0.0, sumX2=0.0, zipfSlope, zipfIntercept;
+
+		if (this->zipfLength <= 0) {
+			cout<<"\n\nError in XY, X2, diff, squaredDiff initialization. zipfLength = 0";
+			cin.get();
+		}
+
+		XY = (double*)malloc(sizeof(double)*this->zipfLength);
+		X2 = (double*)malloc(sizeof(double)*this->zipfLength);
+	
+		for (i=0; i<zipfLength; i++) {
+			XY[i] = zipfLogRanks[i]*zipfLogFrequencies[i];
+			X2[i] = zipfLogRanks[i]*zipfLogRanks[i];
+		}
+	
+		for (i=0; i<zipfLength; i++) {
+			sumX += zipfLogRanks[i];
+			sumY += zipfLogFrequencies[i];
+			sumXY += XY[i];
+			sumX2 += X2[i];
+		}
+	
+		zipfSlope = ((zipfLength * sumXY)-(sumX*sumY))/((zipfLength*sumX2)-(sumX*sumX));
+		zipfIntercept = (sumY-(zipfSlope*sumX))/zipfLength;
+	
+		double *diff, *squaredDiff, expectedVal, sumSquaredDiff=0.0, result;
+	
+		diff = (double*)malloc(sizeof(double)*this->zipfLength);
+		squaredDiff = (double*)malloc(sizeof(double)*this->zipfLength);
+	
+		for (i=0; i<zipfLength; i++) {
+			expectedVal = zipfIntercept + (zipfSlope*zipfLogRanks[i]);
+			diff[i] = expectedVal - zipfLogFrequencies[i];
+			squaredDiff[i] = diff[i]*diff[i];
+			sumSquaredDiff += squaredDiff[i];
+		}
+	
+		result = sumSquaredDiff/zipfLength;
+
+		free(diff);
+		free(squaredDiff);
+		free(XY);
+		free(X2);
+		
+		return result;
+	}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	double Song::zipfPitchVariance_independentFrequency() {
+		int i;
+	
+		double *XY, *X2, sumX=0.0, sumY=0.0, sumXY=0.0, sumX2=0.0, zipfSlope, zipfIntercept;
+
+		if (this->zipfLength <= 0) {
+			cout<<"\n\nError in XY, X2, diff, squaredDiff initialization. zipfLength = 0";
+			cin.get();
+		}
+
+		XY = (double*)malloc(sizeof(double)*this->zipfLength);
+		X2 = (double*)malloc(sizeof(double)*this->zipfLength);
+	
+		for (i=0; i<zipfLength; i++) {
+			XY[i] = zipfLogRanks[i]*zipfLogFrequencies[i];
+			X2[i] = zipfLogFrequencies[i]*zipfLogFrequencies[i];
+		}
+	
+		for (i=0; i<zipfLength; i++) {
+			sumX += zipfLogFrequencies[i];
+			sumY += zipfLogRanks[i];
+			sumXY += XY[i];
+			sumX2 += X2[i];
+		}
+	
+		zipfSlope = ((zipfLength * sumXY)-(sumX*sumY))/((zipfLength*sumX2)-(sumX*sumX));
+		zipfIntercept = (sumY-(zipfSlope*sumX))/zipfLength;
+	
+		double *diff, *squaredDiff, expectedVal, sumSquaredDiff=0.0, result;
+	
+		diff = (double*)malloc(sizeof(double)*this->zipfLength);
+		squaredDiff = (double*)malloc(sizeof(double)*this->zipfLength);
+	
+		for (i=0; i<zipfLength; i++) {
+			expectedVal = zipfIntercept + (zipfSlope*zipfLogFrequencies[i]);
+			diff[i] = expectedVal - zipfLogRanks[i];
+			squaredDiff[i] = diff[i]*diff[i];
+			sumSquaredDiff += squaredDiff[i];
+		}
+	
+		result = sumSquaredDiff/zipfLength;
+
+		free(diff);
+		free(squaredDiff);
+		free(XY);
+		free(X2);		
+
+		return result;
+	}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	double Song::zipfPitchVariance() {
+		int i;
+	
+		this->rankify();	
+	
+		for (i=0; i<88; i++) {
+			if (pitchFrequencies[i] == 0) {
+				break;
+			}
+		}
+		this->zipfLength = i;
+	
+		if (this->zipfLength <= 0) {
+			cout<<"\n\nError in zipfLogRanks, zipfLogFrequencies initialization. zipfLength = 0";
+			cin.get();
+		}
+
+		this->zipfLogRanks = (double*)malloc(sizeof(double)*this->zipfLength);
+		this->zipfLogFrequencies = (double*)malloc(sizeof(double)*this->zipfLength);
+	
+		for (i=0; i<zipfLength; i++) {
+			zipfLogRanks[i] = log(i+1);
+			zipfLogFrequencies[i] = log(pitchFrequencies[i]);
+		}
+	
+		double independentRank = this->zipfPitchVariance_independentRank();
+		double independentFrequency = this->zipfPitchVariance_independentFrequency();
+
+		free(this->zipfLogRanks);
+		free(this->zipfLogFrequencies);
+	
+		return (independentRank+independentFrequency)/2.0;
+	}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	
+	double Song::zipfChromaticPitchVariance_independentRank() {
+		int i;
+	
+		for (i=0; i<zipfChromaticLength; i++) {
+			zipfChromaticLogRanks[i] = log(i+1);
+			zipfChromaticLogFrequencies[i] = log(chromaticPitchFrequencies[i]);
+		}
+	
+		double *XY, *X2, sumX=0.0, sumY=0.0, sumXY=0.0, sumX2=0.0, zipfSlope, zipfIntercept;
+
+		if (this->zipfChromaticLength <= 0) {
+			cout<<"\n\nError in XY, X2, diff, squaredDiff initialization. zipfChromaticLength = 0";
+			cin.get();
+		}
+
+		XY = (double*)malloc(sizeof(double)*this->zipfChromaticLength);
+		X2 = (double*)malloc(sizeof(double)*this->zipfChromaticLength);
+	
+		for (i=0; i<zipfChromaticLength; i++) {
+			XY[i] = zipfChromaticLogRanks[i]*zipfChromaticLogFrequencies[i];
+			X2[i] = zipfChromaticLogRanks[i]*zipfChromaticLogRanks[i];
+		}
+	
+		for (i=0; i<zipfChromaticLength; i++) {
+			sumX += zipfChromaticLogRanks[i];
+			sumY += zipfChromaticLogFrequencies[i];
+			sumXY += XY[i];
+			sumX2 += X2[i];
+		}
+	
+		zipfSlope = ((zipfChromaticLength * sumXY)-(sumX*sumY))/((zipfChromaticLength*sumX2)-(sumX*sumX));
+		zipfIntercept = (sumY-(zipfSlope*sumX))/zipfChromaticLength;
+	
+		double *diff, *squaredDiff, expectedVal, sumSquaredDiff=0.0, result;
+	
+		diff = (double*)malloc(sizeof(double)*this->zipfChromaticLength);
+		squaredDiff = (double*)malloc(sizeof(double)*this->zipfChromaticLength);
+	
+		for (i=0; i<zipfChromaticLength; i++) {
+			expectedVal = zipfIntercept + (zipfSlope*zipfChromaticLogRanks[i]);
+			diff[i] = expectedVal - zipfChromaticLogFrequencies[i];
+			squaredDiff[i] = diff[i]*diff[i];
+			sumSquaredDiff += squaredDiff[i];
+		}
+	
+		result = sumSquaredDiff/zipfChromaticLength;
+
+		free(diff);
+		free(squaredDiff);
+		free(XY);
+		free(X2);
+		
+		return result;
+	}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	
+	double Song::zipfChromaticPitchVariance_independentFrequency() {
+		int i;
+	
+		double *XY, *X2, sumX=0.0, sumY=0.0, sumXY=0.0, sumX2=0.0, zipfSlope, zipfIntercept;
+
+		if (this->zipfChromaticLength <= 0) {
+			cout<<"\n\nError in XY, X2, diff, squaredDiff initialization. zipfChromaticLength = 0";
+			cin.get();
+		}
+
+		XY = (double*)malloc(sizeof(double)*this->zipfChromaticLength);
+		X2 = (double*)malloc(sizeof(double)*this->zipfChromaticLength);
+	
+		for (i=0; i<zipfChromaticLength; i++) {
+			XY[i] = zipfChromaticLogRanks[i]*zipfChromaticLogFrequencies[i];
+			X2[i] = zipfChromaticLogFrequencies[i]*zipfChromaticLogFrequencies[i];
+		}
+	
+		for (i=0; i<zipfChromaticLength; i++) {
+			sumX += zipfChromaticLogFrequencies[i];
+			sumY += zipfChromaticLogRanks[i];
+			sumXY += XY[i];
+			sumX2 += X2[i];
+		}
+	
+		zipfSlope = ((zipfChromaticLength * sumXY)-(sumX*sumY))/((zipfChromaticLength*sumX2)-(sumX*sumX));
+		zipfIntercept = (sumY-(zipfSlope*sumX))/zipfChromaticLength;
+	
+		double *diff, *squaredDiff, expectedVal, sumSquaredDiff=0.0, result;
+	
+		diff = (double*)malloc(sizeof(double)*this->zipfChromaticLength);
+		squaredDiff = (double*)malloc(sizeof(double)*this->zipfChromaticLength);
+	
+		for (i=0; i<zipfChromaticLength; i++) {
+			expectedVal = zipfIntercept + (zipfSlope*zipfChromaticLogFrequencies[i]);
+			diff[i] = expectedVal - zipfChromaticLogRanks[i];
+			squaredDiff[i] = diff[i]*diff[i];
+			sumSquaredDiff += squaredDiff[i];
+		}
+	
+		result = sumSquaredDiff/zipfChromaticLength;
+
+		free(diff);
+		free(squaredDiff);
+		free(XY);
+		free(X2);
+		
+		return result;
+	}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+	
+	double Song::zipfChromaticPitchVariance() {
+		int i;
+	
+		this->chromaticRankify();	
+	
+		for (i=0; i<12; i++) {
+			if (chromaticPitchFrequencies[i] == 0) {
+				break;
+			}
+		}
+		this->zipfChromaticLength = i;
+
+		if (this->zipfChromaticLength <= 0) {
+			cout<<"\n\nError zipfChromaticLogRanks, zipfChromaticLogFrequencies initialization. zipfChromaticLength = 0";
+			cin.get();
+		}
+	
+		this->zipfChromaticLogRanks = (double*)malloc(sizeof(double)*this->zipfChromaticLength);
+		this->zipfChromaticLogFrequencies = (double*)malloc(sizeof(double)*this->zipfChromaticLength);
+	
+		for (i=0; i<zipfChromaticLength; i++) {
+			zipfChromaticLogRanks[i] = log(i+1);
+			zipfChromaticLogFrequencies[i] = log(chromaticPitchFrequencies[i]);
+		}
+	
+		double independentRank = this->zipfChromaticPitchVariance_independentRank();
+		double independentFrequency = this->zipfChromaticPitchVariance_independentFrequency();
+
+		free(this->zipfChromaticLogRanks);
+		free(this->zipfChromaticLogFrequencies);
+	
+		return (independentRank+independentFrequency)/2.0;
+	}
+	
 /////////////////////////////////////////////// END OF ZIPF LAW RELATED FUNCTIONS  ////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -862,124 +944,214 @@ void Song::elide() {
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////// PITCH DISTANCE RELATED FUNCTIONS //////////////////////////////////////////////////////
-/**/
-/**/	void Song::findPitchDistances() {
-/**/		int i, j, k, numberOfOccurances, currentPitch;
-/**/		
-/**/		this->pitchDistances = (int**)malloc(sizeof(int*)*this->zipfLength);
-/**/		for (i=0; i<this->zipfLength; i++) {
-/**/			this->pitchDistances[i] = (int*)malloc(sizeof(int)*this->length);
-/**/		}
-/**/		
-/**/		for (i=0; i<this->zipfLength; i++) {
-/**/			currentPitch = pitchRanks[i];
-/**/			numberOfOccurances = 0;
-/**/			for (j=0, k=0; j<this->length; j++, k++) {
-/**/				if (this->notes[j].pitch == currentPitch) {
-/**/					this->pitchDistances[i][numberOfOccurances] = k;
-/**/					numberOfOccurances += 1;
-/**/					k = -1;
-/**/				}
-/**/			}
-/**/			this->pitchDistances[i][numberOfOccurances] = -1;
-/**/		} 
-/**/	}
-/**/
-/**////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/**/
-/**/	double Song::pitchDistanceVariance() {
-/**/		int i, j;
-/**/		double *variances, sum, mean, diff, squaredDiff, result;
-/**/
-/**/		variances = (double*)malloc(sizeof(double)*this->zipfLength);
-/**/		this->findPitchDistances();
-/**/		for (i=0; i<this->zipfLength; i++) {
-/**/			sum = 0;
-/**/			for (j=0; this->pitchDistances[i][j]!=-1; j++) {
-/**/				sum += this->pitchDistances[i][j];
-/**/			}
-/**/				
-/**/			mean = sum/(double)j;
-/**/			sum = 0;
-/**/	
-/**/			for (j=0; this->pitchDistances[i][j]!=-1; j++) {
-/**/				diff = this->pitchDistances[i][j] - mean;
-/**/				squaredDiff = diff*diff;
-/**/				sum += squaredDiff;
-/**/			}
-/**/	
-/**/			variances[i] = sum/(double)j;
-/**/		}
-/**/
-/**/		sum = 0;
-/**/		for (i=0; i<this->zipfLength; i++) {
-/**/			sum += variances[i];
-/**/		}
-/**/
-/**/		result = sum/(double)this->zipfLength;
-/**/
-/**/		return result;
-/**/	}
-/**/	
-/**////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/**/
-/**/	void Song::findChromaticPitchDistances() {
-/**/		int i, j, k, numberOfOccurances, currentPitch;
-/**/		
-/**/		this->chromaticPitchDistances = (int**)malloc(sizeof(int*)*this->zipfChromaticLength);
-/**/		for (i=0; i<this->zipfChromaticLength; i++) {
-/**/			this->chromaticPitchDistances[i] = (int*)malloc(sizeof(int)*this->length);
-/**/		}
-/**/		
-/**/		for (i=0; i<this->zipfChromaticLength; i++) {
-/**/			currentPitch = chromaticPitchRanks[i];
-/**/			numberOfOccurances = 0;
-/**/			for (j=0, k=0; j<this->length; j++, k++) {
-/**/				if (this->notes[j].chromaticPitch == currentPitch) {
-/**/					this->chromaticPitchDistances[i][numberOfOccurances] = k;
-/**/					numberOfOccurances += 1;
-/**/					k = -1;
-/**/				}
-/**/			}
-/**/			this->chromaticPitchDistances[i][numberOfOccurances] = -1;
-/**/		} 
-/**/	}
-/**/	
-/**////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/**/
-/**/	double Song::chromaticPitchDistanceVariance() {
-/**/		int i, j;
-/**/		double *variances, sum, mean, diff, squaredDiff, result;
-/**/
-/**/		variances = (double*)malloc(sizeof(double)*this->zipfChromaticLength);
-/**/		this->findChromaticPitchDistances();
-/**/		for (i=0; i<this->zipfChromaticLength; i++) {
-/**/			sum = 0;
-/**/			for (j=0; this->chromaticPitchDistances[i][j]!=-1; j++) {
-/**/				sum += this->chromaticPitchDistances[i][j];
-/**/			}
-/**/				
-/**/			mean = sum/(double)j;
-/**/			sum = 0;
-/**/	
-/**/			for (j=0; this->chromaticPitchDistances[i][j]!=-1; j++) {
-/**/				diff = this->chromaticPitchDistances[i][j] - mean;
-/**/				squaredDiff = diff*diff;
-/**/				sum += squaredDiff;
-/**/			}
-/**/	
-/**/			variances[i] = sum/(double)j;
-/**/		}
-/**/
-/**/		sum = 0;
-/**/		for (i=0; i<this->zipfChromaticLength; i++) {
-/**/			sum += variances[i];
-/**/		}
-/**/
-/**/		result = sum/(double)this->zipfChromaticLength;
-/**/
-/**/		return result;
-/**/	}
-/**/
+
+	void Song::findPitchDistances() {
+		int i, j, k, numberOfOccurances, currentPitch;
+		
+		if (this->zipfLength <= 0) {
+			cout<<"\n\nError in pitchDistances initialization. zipfLength = 0";
+			cin.get();
+		}
+
+		if (this->length <= 0) {
+			cout<<"\n\nError in pitchDistances initialization. length = 0";
+			cin.get();
+		}
+		
+		this->pitchDistances = (int**)malloc(sizeof(int*)*this->zipfLength);
+		for (i=0; i<this->zipfLength; i++) {
+			this->pitchDistances[i] = (int*)malloc(sizeof(int)*this->length);
+		}
+		
+		for (i=0; i<this->zipfLength; i++) {
+			currentPitch = pitchRanks[i];
+			numberOfOccurances = 0;
+			for (j=0, k=0; j<this->length; j++, k++) {
+				if (this->notes[j].pitch == currentPitch) {
+					this->pitchDistances[i][numberOfOccurances] = k;
+					numberOfOccurances += 1;
+					k = -1;
+				}
+			}
+			this->pitchDistances[i][numberOfOccurances] = -1;
+		} 
+	}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	double Song::pitchDistanceVariance() {
+		int i, j;
+		double *variances, sum, mean, diff, squaredDiff, result;
+
+		if (this->zipfLength <= 0) {
+			cout<<"\n\nError in variances initialization. zipfLength = 0";
+			cin.get();
+		}
+
+		variances = (double*)malloc(sizeof(double)*this->zipfLength);
+		this->findPitchDistances();
+		for (i=0; i<this->zipfLength; i++) {
+			sum = 0;
+			for (j=0; this->pitchDistances[i][j]!=-1; j++) {
+				sum += this->pitchDistances[i][j];
+			}
+				
+			mean = sum/(double)j;
+			sum = 0;
+	
+			for (j=0; this->pitchDistances[i][j]!=-1; j++) {
+				diff = this->pitchDistances[i][j] - mean;
+				squaredDiff = diff*diff;
+				sum += squaredDiff;
+			}
+	
+			variances[i] = sum/(double)j;
+		}
+
+		sum = 0;
+		for (i=0; i<this->zipfLength; i++) {
+			sum += variances[i];
+		}
+
+		result = sum/(double)this->zipfLength;
+
+		free(variances);
+		free(this->pitchDistances);
+
+		return result;
+	}
+	
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	void Song::findChromaticPitchDistances() {
+		int i, j, k, numberOfOccurances, currentPitch;
+		
+		if (this->zipfChromaticLength <= 0) {
+			cout<<"\n\nError in chromaticPitchDistances initialization. zipfChromaticLength = 0";
+			cin.get();
+		}
+
+		if (this->length <= 0) {
+			cout<<"\n\nError in chromaticPitchDistances initialization. length = 0";
+			cin.get();
+		}
+
+		this->chromaticPitchDistances = (int**)malloc(sizeof(int*)*this->zipfChromaticLength);
+		for (i=0; i<this->zipfChromaticLength; i++) {
+			this->chromaticPitchDistances[i] = (int*)malloc(sizeof(int)*this->length);
+		}
+		
+		for (i=0; i<this->zipfChromaticLength; i++) {
+			currentPitch = chromaticPitchRanks[i];
+			numberOfOccurances = 0;
+			for (j=0, k=0; j<this->length; j++, k++) {
+				if (this->notes[j].chromaticPitch == currentPitch) {
+					this->chromaticPitchDistances[i][numberOfOccurances] = k;
+					numberOfOccurances += 1;
+					k = -1;
+				}
+			}
+			this->chromaticPitchDistances[i][numberOfOccurances] = -1;
+		} 
+	}
+	
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	double Song::chromaticPitchDistanceVariance() {
+		int i, j;
+		double *variances, sum, mean, diff, squaredDiff, result;
+
+		if (this->zipfChromaticLength <= 0) {
+			cout<<"\n\nError in variances initialization. zipfLength = 0";
+			cin.get();
+		}
+
+		variances = (double*)malloc(sizeof(double)*this->zipfChromaticLength);
+		this->findChromaticPitchDistances();
+		for (i=0; i<this->zipfChromaticLength; i++) {
+			sum = 0;
+			for (j=0; this->chromaticPitchDistances[i][j]!=-1; j++) {
+				sum += this->chromaticPitchDistances[i][j];
+			}
+				
+			mean = sum/(double)j;
+			sum = 0;
+	
+			for (j=0; this->chromaticPitchDistances[i][j]!=-1; j++) {
+				diff = this->chromaticPitchDistances[i][j] - mean;
+				squaredDiff = diff*diff;
+				sum += squaredDiff;
+			}
+	
+			variances[i] = sum/(double)j;
+		}
+
+		sum = 0;
+		for (i=0; i<this->zipfChromaticLength; i++) {
+			sum += variances[i];
+		}
+
+		result = sum/(double)this->zipfChromaticLength;
+
+		free(variances);
+		free(this->chromaticPitchDistances);
+
+		return result;
+	}
+
 ///////////////////////////////////////////   END OF PITCH DISTANCE RELATED FUNCTIONS  ////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////    LZ77 COMPRESSION RELATED FUNCTIONS    //////////////////////////////////////////////
+
+	int Song::lz77Length() {
+		int lookAheadPtr, searchPtr;
+		int outputLength = 0;
+
+		if (this->length == 0)
+			return 0;
+
+		for (lookAheadPtr = 0; lookAheadPtr<this->length; lookAheadPtr++) {
+			for (searchPtr = 0; searchPtr<lookAheadPtr; searchPtr++ ) {
+				if (this->notes[lookAheadPtr].pitch == this->notes[searchPtr].pitch) {
+					while (this->notes[lookAheadPtr].pitch == this->notes[searchPtr].pitch) {
+						lookAheadPtr++;
+						searchPtr++;
+					}
+				}
+			}
+			outputLength++;
+		}
+
+		return outputLength;
+	}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	int Song::lz77LengthChromatic() {
+		int lookAheadPtr, searchPtr;
+		int outputLength = 0;
+
+		if (this->length == 0)
+			return 0;
+
+		for (lookAheadPtr = 0; lookAheadPtr<this->length; lookAheadPtr++) {
+			for (searchPtr = 0; searchPtr<lookAheadPtr; searchPtr++ ) {
+				if (this->notes[lookAheadPtr].chromaticPitch == this->notes[searchPtr].chromaticPitch) {
+					while (this->notes[lookAheadPtr].chromaticPitch == this->notes[searchPtr].chromaticPitch) {
+						lookAheadPtr++;
+						searchPtr++;
+					}
+				}
+			}
+			outputLength++;
+		}
+
+		return outputLength;
+	}
+
+//////////////////////////////////////////// END OF LZ77 COMPRESSION RELATED FUNCTIONS  ///////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

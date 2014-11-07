@@ -63,7 +63,7 @@ class Song {
 
 		Song();
 		Song(int);
-		Song(int, double(*)[12]);
+		Song(int, double[12][12]);
 		void preprocess();
 		void addNote(Note);
 		void findFitness();

@@ -135,12 +135,12 @@ int main(int argc, char* argv[]) {
 	cin.get();
 
 	srand(time(NULL));
-	Population population(128, cumulativeTransitionProbabilityMatrix);
+	Population population(144, cumulativeTransitionProbabilityMatrix);
 
 	cout<<"Something Generated. Running genetic iterations..."<<endl;
 
-	for (i=0; i<24; i++) {
-		population.crossover(1, 0.05, 0.05, 0.05);
+	for (i=0; i<48; i++) {
+		population.crossover(1, 0.05, 0.1, 0.05);
 		cout<<endl<<i;
 	}
 
